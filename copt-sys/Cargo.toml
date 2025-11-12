@@ -1,0 +1,16 @@
+[package]
+name = "copt-sys"
+version = "0.1.0"
+edition = "2021"
+authors = ["fluxlinkage <fluxlinkage@sina.com>"]
+description = "Low-level FFI bindings of COPT (Cardinal Optimizer) C API for Rust (unofficial)"
+license = "MIT"
+homepage = "https://github.com/ys-nuem/rust-copt-solver/tree/master/copt-sys"
+#repository = "https://github.com/ys-nuem/rust-gurobi.git"
+
+build = "build.rs"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]

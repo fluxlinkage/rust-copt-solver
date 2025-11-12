@@ -1,0 +1,15 @@
+[package]
+name = "copt-solver"
+version = "0.1.0"
+edition = "2021"
+authors = ["fluxlinkage <fluxlinkage@sina.com>"]
+description = "An unofficial Rust API for COPT (Cardinal Optimizer)"
+categories = ["algorithms", "api-bindings", "mathematics", "science"]
+keywords = ["optimization", "linear", "integer"]
+license = "MIT"
+repository = "https://github.com/fluxlinkage/rust-copt-solver"
+documentation = "https://docs.rs/copt-solver/0.1.0/copt-solver/"
+
+[dependencies]
+clippy = {version = "0.0.*", optional = true}
+copt-sys = {path = "./copt-sys"}
