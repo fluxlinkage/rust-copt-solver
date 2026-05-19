@@ -5,8 +5,8 @@ use std::ptr::null;
 pub unsafe fn from_c_str(s: *const std::ffi::c_char) -> String { CStr::from_ptr(s).to_string_lossy().into_owned() }
 
 
-///
 pub trait From<T> {
+  #[allow(unused)]
   fn from(val: T) -> Self;
 }
 
@@ -106,7 +106,6 @@ impl AsRawPtr<*mut std::ffi::c_char> for Vec<std::ffi::c_char> {
 }
 
 
-///
 pub trait FromRaw<T> {
   fn from(val:T) -> Self;
 }

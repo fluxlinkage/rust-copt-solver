@@ -27,15 +27,15 @@ impl From<std::ffi::NulError> for Error {
     }
   }
   
-  impl std::error::Error for Error {
-    fn description(&self) -> &str {
-      match *self {
-        Error::FromAPI(..) => "error from C API",
-        Error::NulError(ref err) => err.description(),
-        Error::InconsitentDims => "Inconsistent argument dimensions",
-      }
-    }
-  }
+  // impl std::error::Error for Error {
+  //   fn description(&self) -> &str {
+  //     match *self {
+  //       Error::FromAPI(..) => "error from C API",
+  //       Error::NulError(ref err) => err.description(),
+  //       Error::InconsitentDims => "Inconsistent argument dimensions",
+  //     }
+  //   }
+  // }
   
   
   /// A specialized

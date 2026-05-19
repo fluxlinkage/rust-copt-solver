@@ -10,7 +10,7 @@ pub struct LinExpr {
     offset: f64,
 }
 
-impl<'a> From<&'a Var> for LinExpr {
+impl From<&Var> for LinExpr {
     fn from(var: &Var) -> LinExpr {
         LinExpr::new() + var
     }
@@ -28,9 +28,9 @@ impl From<f64> for LinExpr {
     }
 }
 
-impl Into<(Vec<i32>, Vec<f64>, f64)> for LinExpr {
-    fn into(self) -> (Vec<i32>, Vec<f64>, f64) {
-        (self.vars.iter().map(|v| v.0).collect(), self.coeffs, self.offset)
+impl From<LinExpr> for (Vec<i32>, Vec<f64>, f64) {
+    fn from(val: LinExpr) -> Self {
+        (val.vars.iter().map(|v| v.0).collect(), val.coeffs, val.offset)
     }
 }
 
@@ -76,19 +76,19 @@ impl Add for Var {
         LinExpr::new().add_term(1.0, self).add_term(1.0, rhs)
     }
 }
-impl<'a> Add<&'a Var> for Var {
+impl Add<&Var> for Var {
     type Output = LinExpr;
     fn add(self, rhs: &Var) -> LinExpr {
         LinExpr::new().add_term(1.0, self).add_term(1.0, rhs.clone())
     }
 }
-impl<'a> Add<Var> for &'a Var {
+impl Add<Var> for &Var {
     type Output = LinExpr;
     fn add(self, rhs: Var) -> LinExpr {
         LinExpr::new().add_term(1.0, self.clone()).add_term(1.0, rhs)
     }
 }
-impl<'a, 'b> Add<&'b Var> for &'a Var {
+impl Add<&Var> for &Var {
     type Output = LinExpr;
     fn add(self, rhs: &Var) -> LinExpr {
         LinExpr::new().add_term(1.0, self.clone()).add_term(1.0, rhs.clone())
@@ -100,7 +100,7 @@ impl Add<f64> for Var {
         LinExpr::new() + self + rhs
     }
 }
-impl<'a> Add<f64> for &'a Var {
+impl Add<f64> for &Var {
     type Output = LinExpr;
     fn add(self, rhs: f64) -> LinExpr {
         LinExpr::new() + self.clone() + rhs
@@ -114,19 +114,19 @@ impl Sub for Var {
         LinExpr::new().add_term(1.0, self).add_term(-1.0, rhs)
     }
 }
-impl<'a> Sub<&'a Var> for Var {
+impl Sub<&Var> for Var {
     type Output = LinExpr;
     fn sub(self, rhs: &Var) -> LinExpr {
         LinExpr::new().add_term(1.0, self).add_term(-1.0, rhs.clone())
     }
 }
-impl<'a> Sub<Var> for &'a Var {
+impl Sub<Var> for &Var {
     type Output = LinExpr;
     fn sub(self, rhs: Var) -> LinExpr {
         LinExpr::new().add_term(1.0, self.clone()).add_term(-1.0, rhs)
     }
 }
-impl<'a, 'b> Sub<&'b Var> for &'a Var {
+impl Sub<&Var> for &Var {
     type Output = LinExpr;
     fn sub(self, rhs: &Var) -> LinExpr {
         LinExpr::new().add_term(1.0, self.clone()).add_term(-1.0, rhs.clone())
@@ -138,7 +138,7 @@ impl Sub<LinExpr> for Var {
         self + (-expr)
     }
 }
-impl<'a> Sub<LinExpr> for &'a Var {
+impl Sub<LinExpr> for &Var {
     type Output = LinExpr;
     fn sub(self, expr: LinExpr) -> LinExpr {
         self.clone() + (-expr)
@@ -150,7 +150,7 @@ impl Sub<Var> for f64 {
         LinExpr::new() + self + (-rhs)
     }
 }
-impl<'a> Sub<&'a Var> for f64 {
+impl Sub<&Var> for f64 {
     type Output = LinExpr;
     fn sub(self, rhs: &Var) -> LinExpr {
         LinExpr::new() + self + (-rhs.clone())
@@ -164,7 +164,7 @@ impl Neg for Var {
         LinExpr::new().add_term(-1.0, self)
     }
 }
-impl<'a> Neg for &'a Var {
+impl Neg for &Var {
     type Output = LinExpr;
     fn neg(self) -> LinExpr {
         LinExpr::new().add_term(-1.0, self.clone())
@@ -178,7 +178,7 @@ impl Mul<f64> for Var {
         LinExpr::new().add_term(rhs, self)
     }
 }
-impl<'a> Mul<f64> for &'a Var {
+impl Mul<f64> for &Var {
     type Output = LinExpr;
     fn mul(self, rhs: f64) -> Self::Output {
         LinExpr::new().add_term(rhs, self.clone())
@@ -204,7 +204,7 @@ impl Add<LinExpr> for Var {
         rhs.add_term(1.0, self)
     }
 }
-impl<'a> Add<LinExpr> for &'a Var {
+impl Add<LinExpr> for &Var {
     type Output = LinExpr;
     fn add(self, rhs: LinExpr) -> LinExpr {
         rhs.add_term(1.0, self.clone())

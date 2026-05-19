@@ -15,9 +15,9 @@ pub enum VarType {
     Integer,
 }
 
-impl Into<std::ffi::c_char> for VarType {
-    fn into(self) -> std::ffi::c_char {
-        match self {
+impl From<VarType> for std::ffi::c_char {
+    fn from(val: VarType) -> Self {
+        match val {
             VarType::Binary => 'B' as std::ffi::c_char,
             VarType::Continuous => 'C' as std::ffi::c_char,
             VarType::Integer => 'I' as std::ffi::c_char,
@@ -32,9 +32,9 @@ pub enum ConstrSense {
     Less,
 }
 
-impl Into<std::ffi::c_char> for ConstrSense {
-    fn into(self) -> std::ffi::c_char {
-        match self {
+impl From<ConstrSense> for std::ffi::c_char {
+    fn from(val: ConstrSense) -> Self {
+        match val {
             ConstrSense::Equal => 'E' as std::ffi::c_char,
             ConstrSense::Less => 'L' as std::ffi::c_char,
             ConstrSense::Greater => 'G' as std::ffi::c_char,
@@ -48,9 +48,9 @@ pub enum ModelSense {
     Maximize = -1,
 }
 
-impl Into<i32> for ModelSense {
-    fn into(self) -> i32 {
-        (unsafe { std::mem::transmute::<_, i8>(self) }) as i32
+impl From<ModelSense> for i32 {
+    fn from(val: ModelSense) -> Self {
+        (unsafe { std::mem::transmute::<ModelSense, i8>(val) }) as i32
     }
 }
 
@@ -72,7 +72,7 @@ pub enum Status {
 impl From<i32> for Status {
     fn from(val: i32) -> Status {
         match val {
-            0..=10 => unsafe { std::mem::transmute(val as i8) },
+            0..=10 => unsafe { std::mem::transmute::<i8, Status>(val as i8) },
             _ => panic!("cannot convert to Status: {}", val),
         }
     }
@@ -81,9 +81,9 @@ impl From<i32> for Status {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Var(pub i32);
 
-impl Into<i32> for Var {
-    fn into(self) -> i32 {
-        return self.0;
+impl From<Var> for i32 {
+    fn from(val: Var) -> Self {
+        val.0
     }
 }
 
@@ -96,36 +96,38 @@ struct LogCallbackData<'a> {
 
 #[allow(unused_variables)]
 extern "C" fn callback_wrapper(msg: copt_sys::c_str, usrdata: *mut std::ffi::c_void) {
-    let usrdata = unsafe { transmute::<_, &mut LogCallbackData>(usrdata) };
+    let usrdata = unsafe { &mut *usrdata.cast::<LogCallbackData>() };
     //let (callback, model) = (&mut usrdata.callback, &usrdata.model);
     let callback = &mut usrdata.callback;
-    match unsafe { std::ffi::CStr::from_ptr(msg) }.to_str() {
-        Ok(msg_str) => {
-            // let params=crate::callback::LogCallbackParams { msg: msg_str };
-            // callback(params);
-            let _ = catch_unwind(AssertUnwindSafe(move|| {
-                callback(crate::callback::LogCallbackParams { msg: msg_str })
-            }));
-            //println!("{}",params.msg)
-        }
-        Err(_) => {}
+    if let Ok(msg_str) = unsafe { std::ffi::CStr::from_ptr(msg) }.to_str() {
+        // let params=crate::callback::LogCallbackParams { msg: msg_str };
+        // callback(params);
+        let _ = catch_unwind(AssertUnwindSafe(move || {
+            callback(crate::callback::LogCallbackParams { msg: msg_str })
+        }));
+        //println!("{}",params.msg)
     }
 }
 
 struct TerminateCallbackData<'a> {
-    callback: &'a mut dyn FnMut()->bool,
+    callback: &'a mut dyn FnMut() -> bool,
 }
 
 #[allow(unused_variables)]
-extern "C" fn terminate_callback_wrapper(prob: *mut copt_sys::copt_prob, cbdata: *mut std::ffi::c_void, cbctx: std::ffi::c_int,usrdata: *mut std::ffi::c_void)->std::ffi::c_int {
-    let usrdata = unsafe { transmute::<_, &mut TerminateCallbackData>(usrdata) };
+extern "C" fn terminate_callback_wrapper(
+    prob: *mut copt_sys::copt_prob,
+    cbdata: *mut std::ffi::c_void,
+    cbctx: std::ffi::c_int,
+    usrdata: *mut std::ffi::c_void,
+) -> std::ffi::c_int {
+    let usrdata = unsafe { &mut *usrdata.cast::<TerminateCallbackData>() };
     //let (callback, model) = (&mut usrdata.callback, &usrdata.model);
     let callback = &mut usrdata.callback;
-    if callback(){
-        unsafe {COPT_Interrupt(prob)};
-        return 10 as std::ffi::c_int;
-    }else{
-        return 0 as std::ffi::c_int;
+    if callback() {
+        unsafe { COPT_Interrupt(prob) };
+        10 as std::ffi::c_int
+    } else {
+        0 as std::ffi::c_int
     }
 }
 
@@ -148,6 +150,7 @@ impl Model {
         Ok(model)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn add_var(
         &mut self,
         name: &str,
@@ -264,6 +267,11 @@ impl Model {
         Ok(())
     }
 
+    pub fn set_objective_sense(&mut self, sense: ModelSense) -> crate::error::Result<()> {
+        self.check_apicall(unsafe { copt_sys::COPT_SetObjSense(self.model, sense.into()) })?;
+        Ok(())
+    }
+
     pub fn get_attribute<A: crate::attribute::Attr>(
         &self,
         attr: A,
@@ -296,64 +304,100 @@ impl Model {
         Ok(())
     }
 
-    pub fn add_mip_start(&mut self,start:&Vec<(i32, f64)>)-> crate::error::Result<()> {
+    pub fn add_mip_start(&mut self, start: &Vec<(i32, f64)>) -> crate::error::Result<()> {
         if start.is_empty() {
             return Ok(());
         }
-        let mut vars=Vec::with_capacity(start.len());
+        let mut vars = Vec::with_capacity(start.len());
         let mut values = Vec::with_capacity(start.len());
-        for (var,value) in start{
+        for (var, value) in start {
             vars.push(*var);
             values.push(*value);
         }
-        self.check_apicall(unsafe { copt_sys::COPT_AddMipStart(self.model,start.len() as i32,vars.as_ptr(),values.as_ptr()) })
+        self.check_apicall(unsafe {
+            copt_sys::COPT_AddMipStart(
+                self.model,
+                start.len() as i32,
+                vars.as_ptr(),
+                values.as_ptr(),
+            )
+        })
     }
 
     pub fn optimize(&mut self) -> crate::error::Result<()> {
         self.check_apicall(unsafe { copt_sys::COPT_Solve(self.model) })
     }
 
-    pub fn optimize_with_log_callback<F>(&mut self,mut callback: F) -> crate::error::Result<()>
-    where F: FnMut(crate::callback::LogCallbackParams) + 'static {
+    pub fn optimize_with_log_callback<F>(&mut self, mut callback: F) -> crate::error::Result<()>
+    where
+        F: FnMut(crate::callback::LogCallbackParams) + 'static,
+    {
         let usrdata = LogCallbackData { callback: &mut callback };
         self.check_apicall(unsafe {
             copt_sys::COPT_SetLogCallback(self.model, Some(callback_wrapper), transmute(&usrdata))
         })?;
         self.check_apicall(unsafe { copt_sys::COPT_Solve(self.model) })?;
-        self.check_apicall(unsafe {
-            copt_sys::COPT_SetLogCallback(self.model, None, null_mut())
-        })
+        self.check_apicall(unsafe { copt_sys::COPT_SetLogCallback(self.model, None, null_mut()) })
     }
 
-    pub fn optimize_with_terminate_callback<G>(&mut self,mut terminate_callback: G) -> crate::error::Result<()>
-    where G: FnMut() -> bool + 'static {
+    pub fn optimize_with_terminate_callback<G>(
+        &mut self,
+        mut terminate_callback: G,
+    ) -> crate::error::Result<()>
+    where
+        G: FnMut() -> bool + 'static,
+    {
         let terminate_usrdata = TerminateCallbackData { callback: &mut terminate_callback };
         self.check_apicall(unsafe {
-            copt_sys::COPT_SetCallback(self.model, Some(terminate_callback_wrapper), 4i32/*COPT_CBCONTEXT_MIPNODE */,transmute(&terminate_usrdata))
+            copt_sys::COPT_SetCallback(
+                self.model,
+                Some(terminate_callback_wrapper),
+                4i32, /*COPT_CBCONTEXT_MIPNODE */
+                transmute(&terminate_usrdata),
+            )
         })?;
         self.check_apicall(unsafe { copt_sys::COPT_Solve(self.model) })?;
         self.check_apicall(unsafe {
-            copt_sys::COPT_SetCallback(self.model, None, 4i32/*COPT_CBCONTEXT_MIPNODE */,null_mut())
+            copt_sys::COPT_SetCallback(
+                self.model,
+                None,
+                4i32, /*COPT_CBCONTEXT_MIPNODE */
+                null_mut(),
+            )
         })
     }
 
-    pub fn optimize_with_log_callback_and_terminate_callback<F,G>(&mut self,mut callback: F,mut terminate_callback: G) -> crate::error::Result<()>
-    where F: FnMut(crate::callback::LogCallbackParams) + 'static,
-    G: FnMut() -> bool + 'static {
+    pub fn optimize_with_log_callback_and_terminate_callback<F, G>(
+        &mut self,
+        mut callback: F,
+        mut terminate_callback: G,
+    ) -> crate::error::Result<()>
+    where
+        F: FnMut(crate::callback::LogCallbackParams) + 'static,
+        G: FnMut() -> bool + 'static,
+    {
         let usrdata = LogCallbackData { callback: &mut callback };
         let terminate_usrdata = TerminateCallbackData { callback: &mut terminate_callback };
         self.check_apicall(unsafe {
             copt_sys::COPT_SetLogCallback(self.model, Some(callback_wrapper), transmute(&usrdata))
         })?;
         self.check_apicall(unsafe {
-            copt_sys::COPT_SetCallback(self.model, Some(terminate_callback_wrapper), 4i32/*COPT_CBCONTEXT_MIPNODE */,transmute(&terminate_usrdata))
+            copt_sys::COPT_SetCallback(
+                self.model,
+                Some(terminate_callback_wrapper),
+                4i32, /*COPT_CBCONTEXT_MIPNODE */
+                transmute(&terminate_usrdata),
+            )
         })?;
         self.check_apicall(unsafe { copt_sys::COPT_Solve(self.model) })?;
+        self.check_apicall(unsafe { copt_sys::COPT_SetLogCallback(self.model, None, null_mut()) })?;
         self.check_apicall(unsafe {
-            copt_sys::COPT_SetLogCallback(self.model, None, null_mut())
-        })?;
-        self.check_apicall(unsafe {
-            copt_sys::COPT_SetCallback(self.model, None, 4i32/*COPT_CBCONTEXT_MIPNODE */,null_mut())
+            copt_sys::COPT_SetCallback(
+                self.model,
+                None,
+                4i32, /*COPT_CBCONTEXT_MIPNODE */
+                null_mut(),
+            )
         })
     }
 
@@ -365,7 +409,15 @@ impl Model {
 
     pub fn get_lp_results(&self) -> crate::error::Result<Vec<f64>> {
         let mut res = vec![0.0; self.var_count as usize];
-        self.check_apicall(unsafe { copt_sys::COPT_GetLpSolution(self.model, res.as_mut_ptr(), null_mut(),null_mut(),null_mut()) })?;
+        self.check_apicall(unsafe {
+            copt_sys::COPT_GetLpSolution(
+                self.model,
+                res.as_mut_ptr(),
+                null_mut(),
+                null_mut(),
+                null_mut(),
+            )
+        })?;
         Ok(res)
     }
 

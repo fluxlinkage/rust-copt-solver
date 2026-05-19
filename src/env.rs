@@ -69,6 +69,7 @@ impl ErrorFromAPI for Env {
     }
 }
 
+#[allow(unused)]
 pub trait FromRaw {
     fn from_raw(env: *mut copt_sys::copt_env) -> Self;
 }
